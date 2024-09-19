@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Document</title>
+    <title>Create user</title>
      <!--Link to Tailwind CSS CDN for styling-->
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
@@ -15,15 +15,15 @@
         <!-- Login form -->
         <form method= "post" action="/create">
              <!-- Input field for username -->
-            <input class="px-3 py-2 rounded-md bg-transparent border-2 border-zinc-800 outline-none" type="text" placeholder="username" name="username">
+            <input class="px-3 py-2 rounded-md bg-transparent border-2 border-zinc-800 outline-none" type="text" placeholder="username" name="username" required>
               <!-- Input field for email -->
-            <input class="px-3 py-2 rounded-md bg-transparent border-2 border-zinc-800 outline-none" type="email" placeholder="email" name="email">
+            <input class="px-3 py-2 rounded-md bg-transparent border-2 border-zinc-800 outline-none" type="email" placeholder="email" name="email" required>
              <!-- Input field for password -->
-            <input class="px-3 py-2 rounded-md bg-transparent border-2 border-zinc-800 outline-none" type="password" placeholder="password" name="password">
+            <input class="px-3 py-2 rounded-md bg-transparent border-2 border-zinc-800 outline-none" type="password" placeholder="password" name="password" pattern="^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).{8,}$" required title="Password must contain at least 8 characters, including one uppercase, one lowercase, one number, and one special character.">
             <!-- Submit button for the form -->
-            <input class="px-5 py-2 rounded-md bg-blue-500" type="submit" value="create user">
-            
+            <input class="px-5 py-2 rounded-md bg-blue-500" type="submit" value="Register">
         </form>
+        <a href="/login" class="inline-block px-5 py-2 rounded-md bg-blue-500 text-white cursor-pointer mt-4">Already have an account</a>
     </div>
 </body>
 </html>

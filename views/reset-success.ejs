@@ -1,0 +1,25 @@
+<!-- reset.ejs -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Password Reset</title>
+</head>
+<body>
+    <div class="container">
+        <h1>Password Reset</h1>
+        <!-- Display the success message if available -->
+        <% if (success) { %>
+            <p class="text-green-500"><%= success %></p>
+        <% } %>
+        <% if (error) { %>
+            <p class="text-red-500"><%= error %></p>
+        <% } %>
+        <form action="/reset/<%= token %>" method="POST">
+            <input type="password" name="password" placeholder="New Password" required />
+            <button type="submit">Reset Password</button>
+        </form>
+    </div>
+</body>
+</html>

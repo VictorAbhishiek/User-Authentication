@@ -1,26 +1,19 @@
+<!-- reset-success.ejs -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Reset Password</title>
-    <!-- Link to Tailwind CSS CDN for styling -->
-    <script src="https://cdn.tailwindcss.com"></script>
+    <title>Password Reset Success</title>
 </head>
 <body>
-    <!-- Main container for the reset password form -->
-    <div class="w-full h-screen bg-zinc-900 text-white p-10">
-        <!-- Heading for the reset password page -->
-        <h3 class="text-3xl">Reset Password</h3>
-        <!-- Form to handle password reset -->
-        <form method="post" action="/reset-password">
-            <!-- Hidden input field to pass the token -->
-            <input type="hidden" name="token" value="<%= token %>">
-            <!-- Input field for new password -->
-            <input class="px-3 py-2 rounded-md bg-transparent border-2 border-zinc-800 outline-none" type="password" placeholder="Enter new password" name="password" required>
-            <!-- Submit button for the form -->
-            <input class="px-5 py-2 rounded-md bg-blue-500" type="submit" value="Reset Password">
-        </form>
+    <div class="container">
+        <h1>Password Reset</h1>
+        <!-- Display the success message -->
+        <% if (success) { %>
+            <p class="text-green-500"><%= success %></p>
+        <% } %>
+        <a href="/login" class="btn btn-primary">Go to Login</a>
     </div>
 </body>
 </html>

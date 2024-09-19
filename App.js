@@ -1,101 +1,17 @@
-// require('dotenv').config();
-// const cookieParser = require('cookie-parser');
-// const express = require('express');
-// const userModel = require("./models/User");
-// const app = express();
-// const path = require('path');
-// const bcrypt = require('bcrypt');
-// const jwt = require('jsonwebtoken');
-
-
-// //set the view engine to EJS
-// app.set("view engine", "ejs");
-
-// //Middleware to parse JSON and URL-encoded data
-// app.use(express.json());
-// app.use(express.urlencoded({extended: true}));
-
-// // Serve static files from the public directory
-// app.use(express.static(path.join(__dirname, "public")));
-// // Middleware to parse cookies
-// app.use(cookieParser());
-
-// // Route to render the homepage
-// app.get('/', (req, res) =>{
-//     res.render("index");
-// });
-
-
-// // Route to handle user creation (registration)
-// app.post('/create', async (req, res)=>{
-//     let {username, email, password} = req.body; 
-
-//     // Generate a salt and hash the password
-//     bcrypt.genSalt(10, (err, salt)=>{
-//         bcrypt.hash(password, salt, async (err, hash) =>{
-//              // Create a new user with hashed password
-//             let createduser = await userModel.create({
-//                 username,
-//                 email,
-//                 password: hash
-//              })
-//              // Create a JWT token with email
-//              let token = jwt.sign({email}, "secret");
-//              // Set the token as a cookie
-//              res.cookie("token", token);
-//              // Send the created user as a response
-//              res.send(createduser);
-//         })
-//     })
-// });
-// // Route to handle user logout
-// app.get("/logout", (req, res)=>{
-//     // Clear the token cookie
-//     res.cookie("token", "");
-//     // Redirect to the homepage
-//     res.redirect("/");
-// });
-// // Route to render the login page
-// app.get("/login", (req, res) =>{
-//     res.render('login')
-// });
-// // Route to handle user login
-// app.post('/login', async (req, res) =>{
-
-//  // Find a user by email
-//     let user = await userModel.findOne({email: req.body.email});
-//      // If user is not found, send an error message
-//     if(!user) return res.send("something went wrong");
-//     // Compare the provided password with the hashed password
-//     bcrypt.compare(req.body.password, user.password, (err, result)=>{
-//         // If the password matches, create a JWT token
-//         if(result){
-//             let token = jwt.sign({email: user.email}, "secret");
-//              // Set the token as a cookie
-//              res.cookie("token", token);
-//              // Send a success message
-//             res.send("yes you can login");
-//         }
-//         //if password is wrong it displays you can't login
-//         else res.send("you can't login")
-//     })
-// });
-
-// // Start the server on port 3000
-// app.listen(3000);
-require('dotenv').config();    // Load environment variables from .env file
+require('dotenv').config();    
 const cookieParser = require('cookie-parser');
 const express = require('express');
 const userModel = require("./models/User");
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
-const nodemailer = require('nodemailer');
-const { body, validationResult } = require('express-validator');
 const path = require('path');
 
 const app = express();
-const JWT_SECRET = process.env.JWT_SECRET || "your_jwt_secret";
+const JWT_SECRET = process.env.JWT_SECRET || "your_jwt_secret";  // Secret for JWT signing
+const resetTokens = new Map();
+
+
 
 // Set the view engine to EJS
 app.set("view engine", "ejs");
@@ -115,42 +31,43 @@ app.get('/', (req, res) => {
     res.render("index");
 });
 
+
 // Route to handle user creation (registration)
-app.post('/create', 
-    body('username').notEmpty().withMessage('Username is required'),
-    body('email').isEmail().withMessage('Invalid email'),
-    body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters'),
-    async (req, res) => {
-        const errors = validationResult(req);
-        if (!errors.isEmpty()) {
-            return res.status(400).json({ errors: errors.array() });
-        }
+app.post('/create', async (req, res) => {
+    const { username, email, password } = req.body;
 
-        const { username, email, password } = req.body;
-
-        try {
-            const salt = await bcrypt.genSalt(10);
-            const hash = await bcrypt.hash(password, salt);
-
-            const createdUser = await userModel.create({
-                username,
-                email,
-                password: hash
-            });
-
-            const token = jwt.sign({ email: createdUser.email }, JWT_SECRET);
-            res.cookie("token", token, { httpOnly: true });
-            res.status(201).json(createdUser);
-        } catch (error) {
-            res.status(500).json({ error: 'Something went wrong!' });
-        }
+     // Check if the username is provided
+    if (!username) {
+        return res.render('registration', { errorMessage: 'Username is required', username: null });
     }
-);
+    // Validate password strength
+    if (!validatePasswordStrength(password)) {
+        return res.render('registration', { errorMessage: 'Password does not meet strength requirements' });
+    }
+    try {
+        // Hash the password before storing
+        const salt = await bcrypt.genSalt(10);
+        const hash = await bcrypt.hash(password, salt);
+        // Create a new user
+        const createdUser = await userModel.create({
+            username,
+            email,
+            password: hash
+        });
+        // Create JWT token for the user
+        const token = jwt.sign({ email: createdUser.email }, JWT_SECRET);
+        res.cookie("token", token, { httpOnly: true });
+        res.render('registration', {username: createdUser.username});
+    } catch (error) {
+        // Handle server errors
+        res.status(500).send({ error: 'Something went wrong!' });
+    }
+});
 
 // Route to handle user logout
 app.get("/logout", (req, res) => {
-    res.clearCookie("token");
-    res.redirect("/");
+    res.clearCookie("token"); // Clear the cookie on logout
+    res.redirect("/");  // Redirect to homepage
 });
 
 // Route to render the login page
@@ -159,113 +76,123 @@ app.get("/login", (req, res) => {
 });
 
 // Route to handle user login
-app.post('/login',
-    body('email').isEmail().withMessage('Invalid email'),
-    body('password').notEmpty().withMessage('Password is required'),
-    async (req, res) => {
-        const errors = validationResult(req);
-        if (!errors.isEmpty()) {
-            return res.status(400).json({ errors: errors.array() });
+app.post('/login', async (req, res) => {
+    const { email, password } = req.body;
+
+    try {
+        // Find user by emai
+        const user = await userModel.findOne({ email });
+        if (!user){
+             return res.status(404).render('login', {message: 'user not found'});
         }
-
-        const { email, password } = req.body;
-
-        try {
-            const user = await userModel.findOne({ email });
-            if (!user) return res.status(404).send("User not found");
-
-            const isMatch = await bcrypt.compare(password, user.password);
-            if (isMatch) {
-                const token = jwt.sign({ email: user.email }, JWT_SECRET);
-                res.cookie("token", token, { httpOnly: true });
-                res.send("Login successful");
-            } else {
-                res.status(401).send("Invalid credentials");
-            }
-        } catch (error) {
-            res.status(500).send("Something went wrong");
+        // Compare provided password with stored hash
+        const isMatch = await bcrypt.compare(password, user.password);
+        if (isMatch) {
+             // Create JWT token if login is successful
+            const token = jwt.sign({ email: user.email }, JWT_SECRET); 
+            res.cookie("token", token, { httpOnly: true }); // Store token in HTTP-only cookie
+            res.render("sucess", { username: user.username }); // Render success page with username
+        } else {
+          return res.status(401).render('login', {message: "Invalid credentials"});
         }
+    } catch (error) {
+        return res.status(500).render('login', {message:"Something went wrong"});
     }
-);
+});
 
 // Route to render password reset request page
 app.get('/forgot-password', (req, res) => {
-    res.render('forgot-password');
+    res.render('forgot-password',{successMessage: null, errorMessage: null});
 });
 
 // Route to handle password reset request
 app.post('/forgot-password', async (req, res) => {
     const { email } = req.body;
     try {
+        // Find user by email
         const user = await userModel.findOne({ email });
-        if (!user) return res.status(404).send("User not found");
-
+        if (!user) {
+            return res.render('forgot-password', { successMessage: null, errorMessage: 'User not found' });
+        }
         // Generate a reset token
         const resetToken = crypto.randomBytes(20).toString('hex');
-        user.resetPasswordToken = resetToken;
-        user.resetPasswordExpires = Date.now() + 3600000; // 1 hour
+        resetTokens.set(resetToken, { email, expires: Date.now() + 3600000 }); // Token expires in 1 hourr
 
-        await user.save();
+        // Send simulated reset token
+        const resetLink = `http://localhost:3000/reset/${resetToken}`;
+        console.log(`Password reset link: ${resetLink}`);
 
-        // Send email with reset token
-        const transporter = nodemailer.createTransport({
-            service: 'Gmail',
-            auth: {
-                user: process.env.EMAIL_USER,
-                pass: process.env.EMAIL_PASS
-            }
-        });
-
-        const mailOptions = {
-            to: email,
-            from: 'passwordreset@example.com',
-            subject: 'Password Reset',
-            text: `You are receiving this because you (or someone else) have requested the reset of the password for your account.\n\n
-            Please click on the following link, or paste this into your browser to complete the process:\n\n
-            http://${req.headers.host}/reset/${resetToken}\n\n
-            If you did not request this, please ignore this email and your password will remain unchanged.\n`
-        };
-
-        await transporter.sendMail(mailOptions);
-
-        res.status(200).send('Password reset link sent');
+        return res.render('forgot-password', { successMessage: 'Password reset link sent to console', errorMessage: null });
     } catch (error) {
-        res.status(500).send('Something went wrong');
+        return res.render('forgot-password', { successMessage: null, errorMessage: 'Something went wrong' });
     }
 });
 
+// Function to validate password strength
+const validatePasswordStrength = (password) => {
+    if (password.length < 8) return false; // Check for minimum length
+    let strength = 0;
+    if (/[A-Z]/.test(password)) strength += 1; // Uppercase letter
+    if (/[a-z]/.test(password)) strength += 1; // Lowercase letter
+    if (/[0-9]/.test(password)) strength += 1; // digits
+    if (/[^A-Za-z0-9]/.test(password)) strength += 1; // special charatcters
+
+    return strength >= 4; // Require at least 4 out of 5 criteria
+};
 // Route to render password reset form
+// Route to display the reset password form
 app.get('/reset/:token', (req, res) => {
-    res.render('reset', { token: req.params.token });
+    const { token } = req.params;
+
+    // Check if the token is valid and not expired
+    const resetData = resetTokens.get(token);
+    if (!resetData || resetData.expires < Date.now()) {
+        return res.render('reset-password', { token: null, errorMessage: 'Invalid or expired token', successMessage: null });
+    }
+
+    // Render the password reset form
+    res.render('reset-password', { token, successMessage: null, errorMessage: null });
 });
 
-// Route to handle password reset
+// Route to handle the new password submission
 app.post('/reset/:token', async (req, res) => {
-    const { password } = req.body;
-    const resetToken = req.params.token;
+    const { token } = req.params;
+    const { newPassword } = req.body;
+
+    // Check if the token is valid
+    const resetData = resetTokens.get(token);
+    if (!resetData || resetData.expires < Date.now()) {
+        return res.render('reset-password', { token: null, errorMessage: 'Invalid or expired token', successMessage: null });
+    }
+    if (!validatePasswordStrength(newPassword)) {
+        return res.render('reset-password', { token, errorMessage: 'Password does not meet strength requirements', successMessage: null });
+    }
 
     try {
-        const user = await userModel.findOne({
-            resetPasswordToken: resetToken,
-            resetPasswordExpires: { $gt: Date.now() }
-        });
-
-        if (!user) return res.status(400).send('Password reset token is invalid or has expired');
-
+        // Find user and update their password
+        const user = await userModel.findOne({ email: resetData.email });
+        if (!user) {
+            return res.render('reset-password', { token: null, errorMessage: 'User not found', successMessage: null });
+        }
         const salt = await bcrypt.genSalt(10);
-        const hash = await bcrypt.hash(password, salt);
-
-        user.password = hash;
-        user.resetPasswordToken = undefined;
-        user.resetPasswordExpires = undefined;
-
+        // Update user's password (hash the password before storing)
+        user.password = await bcrypt.hash(newPassword,salt); // Assume password hashing is done in user model middleware
         await user.save();
 
-        res.status(200).send('Password has been reset');
+        // Remove the token after use
+        resetTokens.delete(token);
+
+        // Render success message
+        res.render('reset-password', { token: null, successMessage: 'Your password has been successfully updated', errorMessage: null });
     } catch (error) {
-        res.status(500).send('Something went wrong');
+        // Render error message if something goes wrong
+        res.render('reset-password', { token, successMessage: null, errorMessage: 'Failed to update password' });
     }
 });
+
+app.get('/sucess', (req, res)=>{
+    res.render('sucess');
+})
 
 // Start the server on port 3000
 app.listen(3000, () => console.log('Server running on port 3000'));
